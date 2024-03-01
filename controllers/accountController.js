@@ -8,43 +8,48 @@ import Account from "../models/accountModel.js";
  * @swagger
  * components:
  *  schemas:
+ *      VerifyUserCode:
+ *        type: object
+ *        required:
+ *          - code
+ *          - email
+ *        properties:
+ *          email:
+ *            type: string
+ *            description: The user email address
+ *          code:  
+ *            type: integer
+ *            description: The code to verify
  *      User:
- *          type: object
- *          required:
- *              - firstName
- *              - lastName
- *              - email
- *              - password
- *          properties:
- *              id:
- *                  type: integer
- *                  description: the auto-generated id of the user
- *              firstName:
- *                  type: string
- *                  description: name of the user
- *              lastName:
- *                  type: string
- *                  description: last name of the user
- *              email:
- *                  type: string
- *                  description: email of the user
- *              password:
- *                  type: string
- *                  description: the user crypt password
- *              verificationCode:
- *                  type: integer
- *                  description: Generated code for account validation
- *              isVerified:
- *                  type: boolean
- *                  description: Get default of false until user validation
- *          example:
- *              id: 1 
- *              firstName: Genadi
- *              lastName: Astafev     
- *              email: genadi123@mail.com
- *              password: password
- *              verificationCode: 1234
- *              isVerified: false    
+ *        type: object
+ *        required:
+ *          - firstName
+ *          - lastName
+ *          - email
+ *          - password
+ *        properties:
+ *          id:
+ *           type: integer
+ *           description: the auto-generated id of the user
+ *          firstName:
+ *            type: string
+ *            description: name of the user
+ *          lastName:
+ *            type: string
+ *            description: last name of the user
+ *          email:
+ *            type: string
+ *            description: email of the user
+ *          password:
+ *            type: string
+ *            description: the user crypt password
+ *          verificationCode:
+ *            type: integer
+ *            description: Generated code for account validation
+ *          isVerified:
+ *            type: boolean
+ *            description: Get default of false until user validation
+ *          
  */
 /**
  * @swagger
@@ -192,14 +197,135 @@ router.delete('/deleteAccount/:id', (req,res) => {
     })
 })
 
-//
-router.post('/verify', (req, res) => { });
+/**
+ * @swagger 
+ * /api/account/updateAccount/{id}:
+ *  put:
+ *      summary: Update account details
+ *      tags: [Accounts] 
+ *      parameters:
+ *          - in: path
+ *            name: id
+ *            schema:
+ *              type: integer
+ *            required: true
+ *            description: The user id
+ *      requestBody:
+ *        required: true
+ *        content:
+ *          application/json:
+ *            schema:
+ *              $ref: '#/components/schemas/User'
+ *      responses:
+ *        200:
+ *          description: The user account was updated
+ *          content:
+ *            application/json:
+ *              schema:
+ *                $ref: '#/components/schemas/User'
+ */
+
+
+router.put('/updateAccount/:id',(req,res)=>{
+    const userId =req.params.id;
+    const { firstName, lastName } = req.body;
+
+    Account.findByPk(userId)
+    .then(account => {
+      if(account){
+        
+         account.firstName = firstName;
+         account.lastName = lastName;
+         return account.save()
+         .then(results => {
+            return res.status(200).json ({
+                message: results
+            });
+         })
+
+
+        } else {
+        return res.status(401).json ({
+            message: 'User not found',
+        });
+      }
+      
+    })
+
+    .catch(error => {
+        return res.status(500).json ({
+            message: error,
+        });
+    })
+})
+
+/**
+ * @swagger
+ * /api/account/verify:
+ *  put:
+ *     summary: Verify user code
+ *     tags: [Accounts]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *          application/json:
+ *            schema:
+ *              $ref: '#/components/schemas/VerifyUserCode'
+ *     responses:
+ *       200:
+ *          description: Verify the user code update
+ *          content: 
+ *            application/json:
+ *              schema:
+ *                $ref: '#/components/schemas/User'
+ *            
+ */
+router.put('/verify', (req, res) => {
+    const {code, email} = req.body;
+    Account.findAll({where: { email:email }})
+    .then(results =>{
+        if(results.length > 0){
+        const account = results [0];
+        if(parseInt(account.verificationCode) === parseInt(code)){
+            account.isVerified = true; 
+            return account.save()
+            .then(success =>{
+                return res.status(200).json ({
+                    message: success,
+                });
+            })
+        }else {
+            return res.status(401).json({
+                message: 'Verification code is not match',
+            });
+        }  
+        
+        } else {
+            return res.status(401).json({
+                message: 'User not found',
+            });
+        }
+    })
+    .catch(error => {
+        return res.status(500).json({
+            message: error,
+        });
+    })
+   
+});
 
 //
-router.post('/login', (req, res) => { });
+router.post('/login', (req, res) => {
+    // request > email + password 
+    const {email, password} = req.body;
+    //find the user account
+    Account.findAll({where:{email:email}})
+    .then(results)
+    //check if user verified the code 
+    //check for password 
+    //generate token 
+    //response + token 
 
-//
-router.get('/getAccounts', (req, res) => { });
-
+});
 
 export default router;
