@@ -1,13 +1,35 @@
 import express from "express";
 const router = express.Router();
 import bcryptjs from "bcryptjs";
-import jsonwebtoken from 'jsonwebtoken';
+import jwt from 'jsonwebtoken';
 import Account from "../models/accountModel.js";
+import  dotenv from 'dotenv';
+dotenv.config(); 
 
 /**
  * @swagger
  * components:
  *  schemas:
+ *      UserLogin:
+ *        type: object
+ *        required:
+ *          - email
+ *          - password
+ *        properties:
+ *          email:
+ *            type: string
+ *            description: The user email address
+ *          password:
+ *            type: string
+ *            description: The user password
+ *      TokenResponse:
+ *        type: object
+ *        required
+ *          - token
+ *        properties:
+ *          token:
+ *            type: string
+ *            description: The login token
  *      VerifyUserCode:
  *        type: object
  *        required:
@@ -314,13 +336,77 @@ router.put('/verify', (req, res) => {
    
 });
 
-//
+/**
+ * @swagger
+ * /api/account/login:
+ *  post:
+ *    summary: Login
+ *    tags: [Accounts]
+ *    requestBody:
+ *      required: true
+ *      content:
+ *        application/json
+ *          schema: 
+ *            $ref: '#/components/schemas/UserLogin'
+ *    responses:
+ *      200:
+ *        description: The login credential token
+ *        content:
+ *          application/json
+ *            schema:
+ *              $ref: '#/components/schemas/TokenResponse' 
+ *    
+ */
 router.post('/login', (req, res) => {
     // request > email + password 
     const {email, password} = req.body;
     //find the user account
-    Account.findAll({where:{email:email}})
-    .then(results)
+    Account.findAll( {where: { email:email } })
+    .then(async results => {
+        if(results.length > 0){
+            const account = results [0];
+              //check if user verified the code 
+              if(account.isVerified){
+             //check for password 
+              const isMatch = await bcryptjs.compare(password,account.password);
+              if(isMatch){
+                
+                const dataToToken = {
+                  id: account.id,
+                  firstName: account.firstName,
+                  lastName: account.lastName,
+                  email: account.email
+                }
+                
+                const token = await jwt.sign(dataToToken, process.env.TOKEN_KEY);
+                return res.status(200).json({
+                    message: token
+                });
+
+              } else {
+                return res.status(401).json({
+                    message: 'The password is not match',
+                });
+              }
+            
+              }else{
+                return res.status(401).json({
+                    message: 'Please verify your account',
+                });
+              }
+              
+
+            } else {
+                return res.status(401).json({
+                    message: 'User not found',
+                });
+            }
+    })
+    .catch(error => {
+        return res.status(500).json({
+            message: error,
+        });
+    })
     //check if user verified the code 
     //check for password 
     //generate token 
